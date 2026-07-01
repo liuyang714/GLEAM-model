@@ -26,6 +26,17 @@ The model expects the following inputs per patient:
 | 001| IgAN 2+, C3 1+, IgG 1+   | 45  | male  |
 | 002| C3 2+, C1q 1+           | 62  | female|
 
+### test.xlsx (for prediction, optional Class column)
+
+| ID | immunofluorescence_report | age | sex   | Class |
+|----|--------------------------|-----|-------|-------|
+| 001| IgAN 2+, C3 1+, IgG 1+   | 45  | male  | 0     |
+| 002| C3 2+, C1q 1+           | 62  | female| 2     |
+
+> **Column requirements:**
+> - `sex`: must be `"male"` or `"female"` (English, lowercase)
+> - `Class`: optional, only needed if you want to evaluate prediction accuracy
+
 ### .pt feature files
 
 One `.pt` file per patient, containing glomerular features extracted by CONCH:
