@@ -20,7 +20,7 @@ from sklearn.metrics import roc_curve, auc
 
 from ..config import load_config, get_device
 from ..models import GaanClassifier
-from ..utils import set_seed, seed_worker, plot_multiclass_roc
+from ..utils import set_seed, seed_worker, plot_multiclass_roc, plot_confusion_matrix
 from .data import MESTCDataset, image_collate_fn, TASK_CONFIG
 
 
@@ -85,7 +85,19 @@ def train(cfg: dict, task: str) -> None:
     feature_dim = sample_x.shape[-1]
 
     model = GaanClassifier(feature_dim=feature_dim, num_classes=num_classes).to(device)
-    criterion = nn.CrossEntropyLoss()
+
+    # Compute class weights from training data distribution
+    from collections import Counter
+    train_label_counts = Counter(train_ds.labels)
+    total = sum(train_label_counts.values())
+    class_weights = torch.tensor(
+        [total / train_label_counts[i] for i in range(num_classes)],
+        dtype=torch.float, device=device,
+    )
+    class_weights = class_weights / class_weights.sum() * num_classes  # normalize
+    print(f"[{task}] Class weights: {class_weights.tolist()}")
+
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = torch.optim.AdamW(model.parameters(), lr=task_cfg["lr"])
 
     # ---- Training Loop ----
@@ -185,6 +197,11 @@ def train(cfg: dict, task: str) -> None:
             # Multiclass: per-class ROC curves
             class_names = [f"{task}{i}" for i in range(num_classes)]
             plot_multiclass_roc(all_labels, all_probs, class_names, roc_path)
+
+        # Confusion Matrix
+        cm_path = os.path.join(save_dir, f"cm_epoch{epoch}.png")
+        class_names = [f"{task}{i}" for i in range(num_classes)]
+        plot_confusion_matrix(all_labels, all_preds, class_names, cm_path)
 
     print(f"\n[{task}] Training finished. Best Val Acc = {best_val_acc:.4f}")
 

@@ -19,7 +19,7 @@ from transformers import BertTokenizer
 from .config import load_config, get_device
 from .data import make_split, build_text_maps, FusionDataset
 from .models import BertClassifier, GaanClassifier, MLPFeatureFusion
-from .utils import set_seed, plot_multiclass_roc
+from .utils import set_seed, plot_multiclass_roc, plot_confusion_matrix, save_summary_xlsx
 
 
 def train(cfg: dict) -> None:
@@ -212,9 +212,9 @@ def train(cfg: dict) -> None:
             f.write(f"Confusion Matrix:\n{cm}\n")
             f.write(f"{report}\n")
 
-        # Save CSV
-        csv_path = os.path.join(save_dir, f"epoch_{epoch}_results.csv")
-        pd.DataFrame(results_records).to_csv(csv_path, index=False, encoding="utf-8-sig")
+        # Save XLSX
+        xlsx_path = os.path.join(save_dir, f"epoch_{epoch}_results.xlsx")
+        pd.DataFrame(results_records).to_excel(xlsx_path, index=False)
 
         # Save model
         torch.save(fusion.state_dict(), os.path.join(save_dir, f"fusion_epoch_{epoch}.pt"))
@@ -233,7 +233,41 @@ def train(cfg: dict) -> None:
             n_bootstrap=task_cfg.get("n_bootstrap", 500),
         )
 
+        # Confusion Matrix
+        cm_path = os.path.join(save_dir, f"cm_epoch{epoch}.png")
+        plot_confusion_matrix(all_labels, all_preds, class_names, cm_path)
+
     print(f"\nTraining finished. Best Val Acc = {best_val_acc:.4f}")
+    print("Generating final summary.xlsx (bootstrap 1000)...")
+    # Re-run evaluation on best model for summary
+    best_fusion = MLPFeatureFusion(
+        img_dim=task_cfg["img_dim"],
+        text_dim=task_cfg["text_dim"],
+        projection_dim=task_cfg["projection_dim"],
+        num_classes=num_classes,
+    ).to(device)
+    best_fusion.load_state_dict(torch.load(os.path.join(save_dir, "best_model.pt"), map_location=device))
+    best_fusion.eval()
+    all_labels, all_preds, all_probs_final = [], [], []
+    with torch.no_grad():
+        for text_inputs, img_feat_batch, labels_batch in val_loader:
+            input_ids, masks, age, sex = text_inputs
+            input_ids, masks, age, sex = input_ids.to(device), masks.to(device), age.to(device), sex.to(device)
+            img_feat = img_feat_batch.to(device)
+            labels = labels_batch.to(device)
+            with torch.no_grad():
+                img_feat_vec = img_net([img_feat.squeeze(0)], return_feat=True)
+                text_feat_vec = text_net(input_ids, masks, age, sex, return_feat=True)
+            output = best_fusion(img_feat_vec, text_feat_vec)
+            probs = F.softmax(output, dim=1)
+            all_labels.extend(labels.cpu().tolist())
+            all_preds.extend(output.argmax(dim=1).cpu().tolist())
+            all_probs_final.extend(probs.cpu().numpy().tolist())
+    save_summary_xlsx(
+        os.path.join(save_dir, "summary.xlsx"),
+        class_names, all_labels, all_preds, np.array(all_probs_final),
+        title_text="Fusion Six-Class Training Results",
+    )
 
 
 def main():

@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Model weights (too large for GitHub)
+*.pt
+*.pth
+*.ckpt
+!3classification/weights/README.md
+
+# Training output
+output/
+runs/
+logs/
+
+# Data files (private)
+*.csv
+*.xlsx
+*.xls
+*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+*.log

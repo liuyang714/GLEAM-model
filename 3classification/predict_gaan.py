@@ -26,7 +26,7 @@ from sklearn.preprocessing import label_binarize
 
 from .config import load_config, get_device
 from .models import GaanClassifier
-from .utils import set_seed
+from .utils import set_seed, save_summary_xlsx
 
 
 # ============================================================
@@ -113,6 +113,8 @@ def evaluate_and_plot(y_true, y_pred, y_score, save_dir, class_names, n_bootstra
         target_names=[class_names[i] for i in present], digits=4, zero_division=0,
     ))
     print(f"Accuracy: {accuracy_score(y_true, y_pred):.4f}")
+    cm = confusion_matrix(y_true, y_pred, labels=present)
+    print(f"Confusion Matrix:\n{cm}")
 
     # Confusion matrix
     cm = confusion_matrix(y_true, y_pred, labels=present)
@@ -213,6 +215,81 @@ def evaluate_and_plot(y_true, y_pred, y_score, save_dir, class_names, n_bootstra
     plt.savefig(os.path.join(save_dir, "roc_auc.png"), dpi=300)
     plt.close()
 
+    # AUC Boxplot (bootstrap)
+    from matplotlib.collections import PolyCollection
+    rng_box = np.random.RandomState(42)
+    boot_aucs_box = {i: [] for i in present}
+    for _ in range(1000):
+        idx_b = rng_box.randint(0, n, n)
+        for i in present:
+            try:
+                boot_aucs_box[i].append(roc_auc_score(y_onehot[idx_b][:, i], y_score[idx_b][:, i]))
+            except Exception:
+                pass
+
+    plt.figure(figsize=(7, 5))
+    for idx_i, i in enumerate(present):
+        vals = np.array(boot_aucs_box[i])
+        vals = vals[~np.isnan(vals)]
+        if len(vals) == 0:
+            continue
+        bp = plt.gca().boxplot(vals, positions=[idx_i], widths=0.4, showcaps=True, showfliers=False, patch_artist=True)
+        for box in bp["boxes"]:
+            box.set_facecolor(["#FFB7B2", "#FFDAC1", "#E2F0CB", "#B5EAD7", "#C7CEEA", "#E8C4EC"][i % 6])
+            box.set_alpha(0.7)
+            box.set_edgecolor(["#E07A7A", "#E5A97E", "#B0C986", "#79C2A5", "#8FA0D2", "#B387B8"][i % 6])
+        for w in bp["whiskers"]:
+            w.set_color(["#E07A7A", "#E5A97E", "#B0C986", "#79C2A5", "#8FA0D2", "#B387B8"][i % 6])
+        for c in bp["caps"]:
+            c.set_color(["#E07A7A", "#E5A97E", "#B0C986", "#79C2A5", "#8FA0D2", "#B387B8"][i % 6])
+        for m in bp["medians"]:
+            m.set_color(["#E07A7A", "#E5A97E", "#B0C986", "#79C2A5", "#8FA0D2", "#B387B8"][i % 6])
+    ax_box = plt.gca()
+    ax_box.set_xticks(range(len(present)))
+    ax_box.set_xticklabels([class_names[i] for i in present])
+    ax_box.set_ylabel("AUC")
+    ax_box.set_title("AUC Distribution (Bootstrap)")
+    ax_box.grid(axis="y", linestyle=":", alpha=0.4)
+    sns.despine()
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_dir, "auc_boxplot.png"), dpi=300)
+    plt.close()
+
+    # F1 Violin Plot (bootstrap)
+    boot_f1s = {i: [] for i in present}
+    for _ in range(1000):
+        idx_b = rng_box.randint(0, n, n)
+        boot_true_b = y_true[idx_b]
+        boot_pred_b = y_pred[idx_b]
+        for i in present:
+            true_c = (boot_true_b == i).astype(int)
+            pred_c = (boot_pred_b == i).astype(int)
+            boot_f1s[i].append(f1_score(true_c, pred_c, zero_division=0))
+
+    rows_f1 = []
+    for i in present:
+        for v in boot_f1s[i]:
+            rows_f1.append({"Class": class_names[i], "F1": v})
+    df_f1 = pd.DataFrame(rows_f1)
+
+    plt.figure(figsize=(7, 5))
+    palette = {class_names[i]: ["#FFB7B2", "#FFDAC1", "#E2F0CB", "#B5EAD7", "#C7CEEA", "#E8C4EC"][i % 6] for i in present}
+    sns.violinplot(data=df_f1, x="Class", y="F1", order=[class_names[i] for i in present],
+                   inner=None, cut=0, linewidth=0.8, palette=palette, saturation=1.0)
+    violin_bodies = [c for c in plt.gca().collections if isinstance(c, PolyCollection)]
+    for idx_b, body in enumerate(violin_bodies):
+        if idx_b < len(present):
+            body.set_alpha(0.65)
+            body.set_edgecolor(["#E07A7A", "#E5A97E", "#B0C986", "#79C2A5", "#8FA0D2", "#B387B8"][present[idx_b] % 6])
+    plt.xlabel("True labels")
+    plt.ylabel("F1-Score")
+    plt.title("F1-Score Distribution (Bootstrap)")
+    plt.grid(axis="y", linestyle=":", alpha=0.4)
+    sns.despine()
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_dir, "f1_violin.png"), dpi=300)
+    plt.close()
+
 
 # ============================================================
 #  Predict
@@ -272,6 +349,15 @@ def predict(
         evaluate_and_plot(
             [all_true[i] for i in valid], [all_pred[i] for i in valid],
             np.array([all_probs[i] for i in valid]), save_dir, class_names, n_bootstrap, seed,
+        )
+
+        # Summary Excel with bootstrap CI
+        summary_path = os.path.join(save_dir, "summary.xlsx")
+        save_summary_xlsx(
+            summary_path, class_names,
+            [all_true[i] for i in valid], [all_pred[i] for i in valid],
+            np.array([all_probs[i] for i in valid]),
+            title_text="GAAN Six-Class Results",
         )
     else:
         print("No true labels found, skipping evaluation.")

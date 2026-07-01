@@ -18,7 +18,7 @@ from transformers import BertTokenizer
 from .config import load_config, get_device
 from .data import make_split, build_text_maps, BertTextDataset
 from .models import BertClassifier
-from .utils import set_seed, FocalLoss, plot_multiclass_roc, evaluate
+from .utils import set_seed, FocalLoss, plot_multiclass_roc, plot_confusion_matrix, evaluate
 
 
 def train(cfg: dict) -> None:
@@ -121,8 +121,8 @@ def train(cfg: dict) -> None:
         train_acc = total_correct / max(total_samples, 1)
 
         # Validate
-        val_csv = os.path.join(save_dir, f"epoch{epoch}_val_preds.csv")
-        result = evaluate(model, val_loader, device, num_labels, class_names, save_csv=val_csv)
+        val_xlsx = os.path.join(save_dir, f"epoch{epoch}_val_preds.xlsx")
+        result = evaluate(model, val_loader, device, num_labels, class_names, save_csv=val_xlsx)
 
         # Compute val_loss
         model.eval()
@@ -167,6 +167,13 @@ def train(cfg: dict) -> None:
         except Exception as e:
             print(f"ROC plotting failed: {e}")
 
+        # Confusion Matrix
+        cm_path = os.path.join(save_dir, f"cm_epoch{epoch}_val.png")
+        try:
+            plot_confusion_matrix(result["labels"], result["preds"], class_names, cm_path)
+        except Exception as e:
+            print(f"CM plotting failed: {e}")
+
         # Save best model
         if not (result["auc"] != result["auc"]):  # not nan
             if result["auc"] > best_val_auc:
@@ -179,7 +186,16 @@ def train(cfg: dict) -> None:
         torch.save(model.state_dict(), os.path.join(save_dir, f"epoch_{epoch}.pt"))
         scheduler.step()
 
+    # ---- Final summary.xlsx with bootstrap CI on best validation results ----
     print(f"\nTraining finished. Best Val AUC = {best_val_auc:.4f}")
+    print("Generating final summary.xlsx (bootstrap 1000)...")
+    best_result = evaluate(model, val_loader, device, num_labels, class_names)
+    save_summary_xlsx(
+        os.path.join(save_dir, "summary.xlsx"),
+        class_names, best_result["labels"], best_result["preds"],
+        np.array(best_result["probs"]),
+        title_text="BERT Six-Class Training Results",
+    )
 
 
 def main():

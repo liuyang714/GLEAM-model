@@ -27,7 +27,7 @@ from sklearn.preprocessing import label_binarize
 
 from .config import load_config, get_device
 from .models import BertClassifier
-from .utils import set_seed
+from .utils import set_seed, save_summary_xlsx
 
 
 # ============================================================
@@ -146,6 +146,8 @@ def predict(
         print("\nClassification Report:")
         print(classification_report(all_labels, all_preds, target_names=class_names, digits=4, zero_division=0))
         print(f"Accuracy: {accuracy_score(all_labels, all_preds):.4f}")
+        cm = confusion_matrix(all_labels, all_preds)
+        print(f"Confusion Matrix:\n{cm}")
 
         # Save report
         report = classification_report(all_labels, all_preds, target_names=class_names, digits=4, zero_division=0)
@@ -230,6 +232,90 @@ def predict(
         plt.savefig(output_excel.replace(".xlsx", "_roc.png"), dpi=300, bbox_inches="tight")
         plt.close()
         print(f"\n[OK] ROC curve saved to: {output_excel.replace('.xlsx', '_roc.png')}")
+
+        # AUC Boxplot (bootstrap)
+        from matplotlib.collections import PolyCollection
+        boot_aucs_box = {i: [] for i in range(num_classes)}
+        rng_box = np.random.RandomState(42)
+        for _ in range(1000):
+            idx_b = rng_box.randint(0, n, n)
+            for i in range(num_classes):
+                try:
+                    boot_aucs_box[i].append(roc_auc_score(y_onehot[idx_b][:, i], y_prob[idx_b][:, i]))
+                except Exception:
+                    pass
+
+        plt.figure(figsize=(7, 5))
+        for i in range(num_classes):
+            vals = np.array(boot_aucs_box[i])
+            vals = vals[~np.isnan(vals)]
+            if len(vals) == 0:
+                continue
+            bp = plt.gca().boxplot(vals, positions=[i], widths=0.4, showcaps=True, showfliers=False, patch_artist=True)
+            for box in bp["boxes"]:
+                box.set_facecolor(["#FFB7B2", "#FFDAC1", "#E2F0CB", "#B5EAD7", "#C7CEEA", "#E8C4EC"][i % 6])
+                box.set_alpha(0.7)
+                box.set_edgecolor(["#E07A7A", "#E5A97E", "#B0C986", "#79C2A5", "#8FA0D2", "#B387B8"][i % 6])
+            for w in bp["whiskers"]:
+                w.set_color(["#E07A7A", "#E5A97E", "#B0C986", "#79C2A5", "#8FA0D2", "#B387B8"][i % 6])
+            for c in bp["caps"]:
+                c.set_color(["#E07A7A", "#E5A97E", "#B0C986", "#79C2A5", "#8FA0D2", "#B387B8"][i % 6])
+            for m in bp["medians"]:
+                m.set_color(["#E07A7A", "#E5A97E", "#B0C986", "#79C2A5", "#8FA0D2", "#B387B8"][i % 6])
+        ax_box = plt.gca()
+        ax_box.set_xticks(range(num_classes))
+        ax_box.set_xticklabels(class_names)
+        ax_box.set_ylabel("AUC")
+        ax_box.set_title("AUC Distribution (Bootstrap)")
+        ax_box.grid(axis="y", linestyle=":", alpha=0.4)
+        sns.despine()
+        plt.tight_layout()
+        plt.savefig(output_excel.replace(".xlsx", "_auc_boxplot.png"), dpi=300, bbox_inches="tight")
+        plt.close()
+        print(f"[OK] AUC boxplot saved to: {output_excel.replace('.xlsx', '_auc_boxplot.png')}")
+
+        # F1 Violin Plot (bootstrap)
+        boot_f1s = {i: [] for i in range(num_classes)}
+        for _ in range(1000):
+            idx_b = rng_box.randint(0, n, n)
+            boot_true_b = np.array(all_labels)[idx_b]
+            boot_pred_b = np.array(all_preds)[idx_b]
+            for i in range(num_classes):
+                true_c = (boot_true_b == i).astype(int)
+                pred_c = (boot_pred_b == i).astype(int)
+                boot_f1s[i].append(f1_score(true_c, pred_c, zero_division=0))
+
+        rows_f1 = []
+        for i in range(num_classes):
+            for v in boot_f1s[i]:
+                rows_f1.append({"Class": class_names[i], "F1": v})
+        df_f1 = pd.DataFrame(rows_f1)
+
+        plt.figure(figsize=(7, 5))
+        palette = {class_names[i]: ["#FFB7B2", "#FFDAC1", "#E2F0CB", "#B5EAD7", "#C7CEEA", "#E8C4EC"][i % 6] for i in range(num_classes)}
+        sns.violinplot(data=df_f1, x="Class", y="F1", order=class_names,
+                       inner=None, cut=0, linewidth=0.8, palette=palette, saturation=1.0)
+        violin_bodies = [c for c in plt.gca().collections if isinstance(c, PolyCollection)]
+        for idx_b, body in enumerate(violin_bodies):
+            if idx_b < num_classes:
+                body.set_alpha(0.65)
+                body.set_edgecolor(["#E07A7A", "#E5A97E", "#B0C986", "#79C2A5", "#8FA0D2", "#B387B8"][idx_b % 6])
+        plt.xlabel("True labels")
+        plt.ylabel("F1-Score")
+        plt.title("F1-Score Distribution (Bootstrap)")
+        plt.grid(axis="y", linestyle=":", alpha=0.4)
+        sns.despine()
+        plt.tight_layout()
+        plt.savefig(output_excel.replace(".xlsx", "_f1_violin.png"), dpi=300, bbox_inches="tight")
+        plt.close()
+        print(f"[OK] F1 violin saved to: {output_excel.replace('.xlsx', '_f1_violin.png')}")
+
+        # Summary Excel with bootstrap CI
+        summary_path = output_excel.replace(".xlsx", "_summary.xlsx")
+        save_summary_xlsx(
+            summary_path, class_names, all_labels, all_preds, np.array(all_probs),
+            title_text="BERT Six-Class Results",
+        )
     else:
         print("No true labels found, skipping evaluation.")
 

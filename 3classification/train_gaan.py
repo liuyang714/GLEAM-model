@@ -19,7 +19,7 @@ from .data import ImageFeatureDataset, image_collate_fn
 from .models import GaanClassifier
 from .utils import (
     set_seed, seed_worker, FocalLoss,
-    plot_multiclass_roc, evaluate,
+    plot_multiclass_roc, plot_confusion_matrix, evaluate, save_summary_xlsx,
 )
 
 
@@ -98,7 +98,7 @@ def train(cfg: dict) -> None:
         # Validate
         result = evaluate(
             model, val_loader, device, num_classes,
-            save_csv=os.path.join(save_dir, f"val_epoch{epoch}_predictions.csv"),
+            save_csv=os.path.join(save_dir, f"val_epoch{epoch}_predictions.xlsx"),
             dataset=val_ds,
         )
 
@@ -118,6 +118,10 @@ def train(cfg: dict) -> None:
         # ROC
         roc_path = os.path.join(save_dir, f"val_epoch{epoch}_roc.png")
         plot_multiclass_roc(result["labels"], result["probs"], class_names, roc_path)
+
+        # Confusion Matrix
+        cm_path = os.path.join(save_dir, f"val_epoch{epoch}_cm.png")
+        plot_confusion_matrix(result["labels"], result["preds"], class_names, cm_path)
 
         print(
             f"Epoch {epoch}/{task_cfg['epochs']}  "
@@ -146,6 +150,14 @@ def train(cfg: dict) -> None:
                 f.write(f"  >> Best model saved (val_acc={best_val_acc:.4f})\n")
 
     print(f"\nTraining finished. Best Val Acc = {best_val_acc:.4f}")
+    print("Generating final summary.xlsx (bootstrap 1000)...")
+    best_result = evaluate(model, val_loader, device, num_classes)
+    save_summary_xlsx(
+        os.path.join(save_dir, "summary.xlsx"),
+        class_names, best_result["labels"], best_result["preds"],
+        np.array(best_result["probs"]),
+        title_text="GAAN Six-Class Training Results",
+    )
 
 
 def main():
