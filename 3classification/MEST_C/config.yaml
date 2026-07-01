@@ -7,11 +7,11 @@ common:
   cuda_device: "0"
 
 data:
-  partition_csv: "/mnt/disk3/liuyang/LYcom/awholeprocess/前瞻性数据集/iga微调2/partition.csv"
-  image_feat_dir: "/mnt/disk3/liuyang/TransMIL-main/process/conch_G1_1120"
+  partition_csv: "/path/to/partition.csv"
+  image_feat_dir: "/path/to/conch_features"
 
 mestc:
-  save_dir: "/mnt/disk3/liuyang/LYcom/awholeprocess/前瞻性数据集/iga微调2/mestc"
+  save_dir: "/path/to/save_dir"
   batch_size: 1
   lr: 1.0e-4
   epochs: 100

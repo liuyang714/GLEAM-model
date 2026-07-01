@@ -278,14 +278,14 @@ def process_pipeline(crop_folder, txt_folder, wsi_folder, output_folder,
 
 
 if __name__ == "__main__":
-    crop_folder   = r"/mnt/disk3/liuyang/KidneyData/sc2leve2crops/704/crop"
-    txt_folder    = r"/mnt/disk3/liuyang/yolov8/runs/detect/predict28/labels"
-    wsi_folder    = r"/mnt/disk3/liuyang/KidneyData/sc2svs/szdmt第3批svs"
-    output_folder = r"/mnt/disk3/liuyang/KidneyData/sc2leve2crops/704/cropglos"
+    crop_folder   = r"/path/to/crops"
+    txt_folder    = r"/path/to/yolo/labels"
+    wsi_folder    = r"/path/to/wsi/svs"
+    output_folder = r"/path/to/output"
 
     # Optional outputs (set to None to skip)
-    json_folder    = r"/mnt/disk3/liuyang/KidneyData/sc2leve2crops/704/json"
-    restored_folder = r"/mnt/disk3/liuyang/KidneyData/sc2leve2crops/704/restored"
+    json_folder    = r"/path/to/json"
+    restored_folder = r"/path/to/restored"
 
     process_pipeline(
         crop_folder, txt_folder, wsi_folder, output_folder,
