@@ -29,8 +29,8 @@ def evaluate_task(df: pd.DataFrame, task: str, output_dir: str, n_bootstrap: int
     """Evaluate a single MEST-C task: ROC + confusion matrix only."""
 
     num_classes = TASK_CONFIG[task]
-    true_col = f"{task}_真实标签"
-    pred_col = f"{task}_预测标签"
+    true_col = f"{task}"
+    pred_col = f"{task}_pred"
     prob_cols = sorted([c for c in df.columns if re.match(rf"^{task}\d+$", c)])
 
     if true_col not in df.columns or pred_col not in df.columns:
