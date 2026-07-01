@@ -1,0 +1,61 @@
+# ============================================================
+#  GLEAM — Unified Configuration
+#  Modify this file to set paths and hyperparameters
+# ============================================================
+
+# ---- Common ----
+common:
+  seed: 1208
+  num_labels: 6
+  class_names: ["IgAN", "MCD", "MN", "DN", "MSPGN", "LN"]
+  cuda_device: "0"              # GPU index, or "cpu"
+
+# ---- Data Paths ----
+data:
+  partition_csv: "/path/to/partition.csv"        # Train/val split CSV
+  text_excel:    "/path/to/text_data.xlsx"       # IF reports + clinical variables
+  image_feat_dir: "/path/to/conch_features"      # Directory of .pt feature files
+
+# ---- Model Paths ----
+models:
+  # Pretrained Med-BERT (Chinese): fine-tuned on your dataset
+  # Download: https://github.com/trueto/medbert
+  pretrained_bert: "/path/to/medbert-base-chinese"
+
+  # Pretrained sub-model weights (frozen in fusion training)
+  # These are trained by train_bert.py and train_gaan.py respectively
+  text_model_path: "/path/to/best_bert.pt"       # From train_bert.py
+  img_model_path:  "/path/to/best_gaan.pt"       # From train_gaan.py
+
+# ---- BERT Text Branch ----
+bert:
+  save_dir: "./output/bert"
+  batch_size: 32
+  lr: 1.0e-5                   # Pretrained BERT uses small LR
+  epochs: 80
+  max_len: 256
+  num_workers: 4
+  use_focal: false
+  use_weighted_sampler: false
+  use_oversampling: true
+
+# ---- GAAN Image Branch ----
+gaan:
+  save_dir: "./output/gaan"
+  batch_size: 1                # Variable bag size, keep at 1
+  lr: 1.0e-4
+  epochs: 100
+  num_workers: 0
+
+# ---- Fusion MLP ----
+fusion:
+  save_dir: "./output/fusion"
+  batch_size: 1
+  lr: 1.0e-4
+  epochs: 150
+  max_len: 256
+  num_workers: 0
+  img_dim: 256                 # GAAN output dim
+  text_dim: 768                # BERT output dim
+  projection_dim: 512          # Shared projection space
+  n_bootstrap: 500             # ROC bootstrap CI iterations
