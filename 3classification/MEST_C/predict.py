@@ -261,7 +261,6 @@ def _save_summary_xlsx(output_dir, class_names, y_true, y_pred, y_score, task_na
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "具体数据"
 
     dark_blue, mid_blue, light_grid = "2F5597", "8EA9DB", "D9E2F3"
     title_fill = PatternFill("solid", fgColor=dark_blue)
@@ -307,7 +306,7 @@ def _save_summary_xlsx(output_dir, class_names, y_true, y_pred, y_score, task_na
     for c in range(1, len(headers) + 1):
         ws.column_dimensions[get_column_letter(c)].width = 22
 
-    xlsx_path = os.path.join(output_dir, f"{task_name}_具体数据.xlsx")
+    xlsx_path = os.path.join(output_dir, f"{task_name}_summary.xlsx")
     wb.save(xlsx_path)
     print(f"[OK] Summary xlsx saved to: {xlsx_path}")
 

@@ -114,7 +114,6 @@ def apply_unified_axis_style(ax, fontname='Arial'):
 
 
 def remove_legend_title(legend):
-    """彻底去除图例标题。"""
     if legend is not None:
         legend.set_title("")
         title = legend.get_title()
@@ -677,7 +676,6 @@ def save_summary_xlsx(
     # ---- Write Excel: rows=Metrics, columns=Classes ----
     wb = Workbook()
     ws = wb.active
-    ws.title = "具体数据"
 
     dark_blue, mid_blue, light_grid = "2F5597", "8EA9DB", "D9E2F3"
     title_fill = PatternFill("solid", fgColor=dark_blue)
